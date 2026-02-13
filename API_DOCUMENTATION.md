@@ -1,4 +1,4 @@
-# TaskFlow API Documentation
+# TaskIT API Documentation
 
 ## Base URL
 ```
@@ -436,7 +436,7 @@ Create a `.env` file in the root directory:
 
 ```
 PORT=3001
-MONGODB_URI=mongodb://localhost:27017/taskflow
+MONGODB_URI=mongodb://localhost:27017/taskit
 JWT_SECRET=your-super-secret-jwt-key-change-this
 
 VITE_API_URL=http://localhost:3001

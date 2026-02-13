@@ -73,6 +73,19 @@ body {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
+/* Custom light background colors for columns */
+.bg-red-25 {
+  background-color: #fef2f2;
+}
+
+.bg-blue-25 {
+  background-color: #eff6ff;
+}
+
+.bg-emerald-25 {
+  background-color: #f0fdf4;
+}
+
 .task-card {
   transition: all 0.2s ease;
 }
@@ -110,4 +123,31 @@ input, textarea, select {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Animation delays */
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-1000 {
+  animation-delay: 1000ms;
+}
+
+/* Smooth animations */
+@keyframes bounce-smooth {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce-smooth 1s infinite;
 }

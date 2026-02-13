@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
+import { Moon, Sun } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login, signup } = useAuthStore();
+  const { isDark, toggleTheme } = useThemeStore();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -57,55 +60,56 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="auth-page min-h-screen flex items-center justify-center p-8"
-      style={{
-        backgroundImage: 'url(https://cdn.builder.io/api/v1/image/assets%2Fac959fb4a2c642cdad570cf5ce6b4aad%2Fdcc5fa33276b4cf79301ae9ee9e744fa?format=webp&width=800&height=1200)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
-      }}
-    >
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+    <div className="auth-page min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 dark:from-slate-100 dark:via-purple-50 dark:to-slate-100 relative overflow-hidden transition-colors duration-300">
+      {/* Animated background elements */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/20 dark:bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/20 dark:bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+
+      {/* Theme Toggle Button */}
+      <button
+        onClick={toggleTheme}
+        className="absolute top-8 right-8 p-2 rounded-lg bg-white/10 dark:bg-slate-800/30 hover:bg-white/20 dark:hover:bg-slate-700/30 text-white dark:text-slate-300 transition-all border border-white/20 dark:border-slate-700/30 z-10"
+      >
+        {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
 
       {/* Form Container */}
       <div className="relative z-10 w-full max-w-sm">
-        <div className="auth-form-box bg-white bg-opacity-95 backdrop-blur-sm rounded-lg p-8 shadow-xl">
+        <div className="auth-form-box bg-gradient-to-br from-slate-800/40 to-slate-900/40 dark:from-white/40 dark:to-slate-100/40 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-slate-700/30 dark:border-slate-300/30 transition-colors duration-300">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">TaskFlow</h1>
-            <p className="text-gray-600 text-sm mt-2">Project Management</p>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">TaskIT</h1>
+            <p className="text-slate-300 dark:text-slate-700 text-sm mt-2 font-medium">Project Management</p>
           </div>
 
           {/* Form Title */}
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">
-            {mode === 'login' ? 'Sign in' : 'Create account'}
+          <h2 className="text-2xl font-bold text-white dark:text-slate-900 mb-1">
+            {mode === 'login' ? 'Welcome back' : 'Get started'}
           </h2>
-          <p className="text-gray-600 text-sm mb-8">
+          <p className="text-slate-300 dark:text-slate-600 text-sm mb-8">
             {mode === 'login'
-              ? 'Welcome back. Enter your details below.'
-              : 'Get started with TaskFlow today.'}
+              ? 'Enter your credentials to access your projects.'
+              : 'Create your account to manage projects efficiently.'}
           </p>
 
           {/* Tabs */}
-          <div className="form-tabs flex gap-0 mb-8 border-b border-gray-200">
+          <div className="form-tabs flex gap-0 mb-8 bg-slate-700/30 dark:bg-slate-400/20 rounded-lg p-1">
             <button
               onClick={() => setMode('login')}
-              className={`pb-4 px-2 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex-1 pb-2 px-2 text-sm font-semibold rounded-md transition-all ${
                 mode === 'login'
-                  ? 'border-gray-900 text-gray-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                  : 'text-slate-300 dark:text-slate-700 hover:text-white dark:hover:text-slate-900'
               }`}
             >
               Sign In
             </button>
             <button
               onClick={() => setMode('signup')}
-              className={`pb-4 px-2 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex-1 pb-2 px-2 text-sm font-semibold rounded-md transition-all ${
                 mode === 'signup'
-                  ? 'border-gray-900 text-gray-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                  : 'text-slate-300 dark:text-slate-700 hover:text-white dark:hover:text-slate-900'
               }`}
             >
               Sign Up
@@ -116,7 +120,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div className="input-group">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-200 dark:text-slate-700 mb-2">
                   Full Name
                 </label>
                 <input
@@ -125,14 +129,14 @@ export default function LoginPage() {
                   value={formData.name}
                   onChange={handleInputChange}
                   placeholder="John Doe"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400"
+                  className="w-full px-4 py-2.5 border border-slate-600/50 dark:border-slate-400/50 rounded-lg bg-slate-700/20 dark:bg-slate-300/20 text-white dark:text-slate-900 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 transition-all"
                   required={mode === 'signup'}
                 />
               </div>
             )}
 
             <div className="input-group">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-slate-200 dark:text-slate-700 mb-2">
                 Email
               </label>
               <input
@@ -141,13 +145,13 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="you@example.com"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400"
+                className="w-full px-4 py-2.5 border border-slate-600/50 dark:border-slate-400/50 rounded-lg bg-slate-700/20 dark:bg-slate-300/20 text-white dark:text-slate-900 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 transition-all"
                 required
               />
             </div>
 
             <div className="input-group">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-slate-200 dark:text-slate-700 mb-2">
                 Password
               </label>
               <input
@@ -156,13 +160,13 @@ export default function LoginPage() {
                 value={formData.password}
                 onChange={handleInputChange}
                 placeholder="••••••••"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400"
+                className="w-full px-4 py-2.5 border border-slate-600/50 dark:border-slate-400/50 rounded-lg bg-slate-700/20 dark:bg-slate-300/20 text-white dark:text-slate-900 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 transition-all"
                 required
               />
             </div>
 
             {error && (
-              <div className="error-alert bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+              <div className="error-alert bg-red-500/20 dark:bg-red-500/10 border border-red-500/50 dark:border-red-500/30 text-red-200 dark:text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
@@ -170,11 +174,32 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="submit-button w-full bg-gray-900 text-white py-2.5 px-4 rounded-md font-medium hover:bg-gray-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+              className="submit-button w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2.5 px-4 rounded-lg font-semibold hover:shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-3 transform hover:scale-105"
             >
               {loading ? 'Loading...' : mode === 'login' ? 'Sign in' : 'Create account'}
             </button>
           </form>
+
+          {/* Demo Buttons */}
+          {mode === 'login' && (
+            <div className="mt-6 space-y-2 pt-6 border-t border-slate-700/30 dark:border-slate-400/30">
+              <p className="text-xs text-slate-400 dark:text-slate-600 text-center mb-3">Quick demo access</p>
+              <button
+                onClick={() => handleDemoLogin('admin')}
+                disabled={loading}
+                className="w-full px-4 py-2.5 border border-slate-600/50 dark:border-slate-400/50 rounded-lg text-slate-300 dark:text-slate-700 hover:text-white dark:hover:text-slate-900 hover:bg-slate-700/30 dark:hover:bg-slate-300/30 transition-all text-sm font-medium"
+              >
+                👤 Admin Demo
+              </button>
+              <button
+                onClick={() => handleDemoLogin('user')}
+                disabled={loading}
+                className="w-full px-4 py-2.5 border border-slate-600/50 dark:border-slate-400/50 rounded-lg text-slate-300 dark:text-slate-700 hover:text-white dark:hover:text-slate-900 hover:bg-slate-700/30 dark:hover:bg-slate-300/30 transition-all text-sm font-medium"
+              >
+                👥 User Demo
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
