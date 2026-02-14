@@ -197,12 +197,12 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="main-content flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="header bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-slate-700/50 dark:border-slate-800/50 px-8 py-6 flex items-center justify-between shadow-lg transition-colors duration-300">
+        <header className="header bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-slate-700/50 dark:border-slate-800/50 px-8 py-4 flex items-center justify-between shadow-lg transition-colors duration-300">
           <div className="header-left">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent leading-tight">
               Dashboard
             </h2>
-            <p className="text-xs text-slate-400 mt-1">Manage all your projects</p>
+            <p className="text-xs text-slate-400 mt-0.5">Manage all your projects</p>
           </div>
           <div className="header-right flex items-center gap-3">
             <input

@@ -3,14 +3,47 @@ import axios from 'axios';
 import { Plus, Trash2, AlertCircle, ChevronRight, Check } from 'lucide-react';
 import { wsService } from '../services/websocket';
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+}
+
+interface Comment {
+  _id: string;
+  author: User;
+  text: string;
+  createdAt: string;
+}
+
+interface TimeEntry {
+  _id: string;
+  userId: User;
+  duration: number;
+  date: string;
+}
+
+interface ActivityItem {
+  _id: string;
+  userId: User;
+  action: string;
+  description: string;
+  timestamp: string;
+}
+
 interface Task {
   _id: string;
   title: string;
   description: string;
   status: 'todo' | 'inprogress' | 'done';
   priority: 'low' | 'medium' | 'high';
-  assignee?: { _id: string; name: string };
+  assignee?: User;
   dueDate?: string;
+  labels: string[];
+  comments: Comment[];
+  timeEntries: TimeEntry[];
+  totalTimeSpent: number;
+  activityFeed: ActivityItem[];
   order: number;
 }
 
@@ -47,9 +80,15 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
     done: '',
   });
   const [draggingTask, setDraggingTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetails, setShowTaskDetails] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<User[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [newLabel, setNewLabel] = useState('');
 
   useEffect(() => {
     fetchTasks();
+    fetchProjectMembers();
 
     // Connect to WebSocket (optional, app works without it)
     const connectWebSocket = async () => {
@@ -103,6 +142,20 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
     };
   }, [projectId]);
 
+  const fetchProjectMembers = async () => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/projects/${projectId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.members) {
+        setTeamMembers(response.data.members);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch project members');
+    }
+  };
+
   const fetchTasks = async () => {
     try {
       const response = await axios.get(
@@ -120,10 +173,12 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
           description: 'Build charts for user engagement and system performance.',
           status: 'todo',
           priority: 'medium',
-          project: projectId,
           order: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          labels: ['frontend', 'dashboard'],
+          comments: [],
+          timeEntries: [],
+          totalTimeSpent: 0,
+          activityFeed: []
         },
         {
           _id: 'task-2',
@@ -131,10 +186,12 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
           description: 'Create a consistent set of UI components based on the new brand guidelines.',
           status: 'inprogress',
           priority: 'high',
-          project: projectId,
           order: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          labels: ['design', 'components'],
+          comments: [],
+          timeEntries: [],
+          totalTimeSpent: 0,
+          activityFeed: []
         },
         {
           _id: 'task-3',
@@ -142,10 +199,12 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
           description: 'Implement login, registration, and password recovery screens.',
           status: 'done',
           priority: 'high',
-          project: projectId,
           order: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          labels: ['auth'],
+          comments: [],
+          timeEntries: [],
+          totalTimeSpent: 120,
+          activityFeed: []
         },
         {
           _id: 'task-4',
@@ -153,10 +212,12 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
           description: 'Ensure the application looks good on all device sizes.',
           status: 'todo',
           priority: 'low',
-          project: projectId,
           order: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          labels: ['responsive'],
+          comments: [],
+          timeEntries: [],
+          totalTimeSpent: 0,
+          activityFeed: []
         }
       ];
       setTasks(demoTasks);
@@ -189,8 +250,11 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
         priority: 'medium',
         dueDate: newTaskDueDate[status] || undefined,
         order: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        labels: [],
+        comments: [],
+        timeEntries: [],
+        totalTimeSpent: 0,
+        activityFeed: []
       };
       setTasks([...tasks, demoTask]);
       setNewTaskTitle((prev) => ({ ...prev, [status]: '' }));
@@ -232,6 +296,93 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
       console.warn('Failed to delete task from API, removing locally');
       // Remove from local state even if API fails
       setTasks(tasks.filter((t) => t._id !== taskId));
+    }
+  };
+
+  const handleAssignTask = async (taskId: string, userId: string | null) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/tasks/${taskId}`,
+        { assignee: userId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTasks(tasks.map((t) => (t._id === taskId ? response.data : t)));
+      if (selectedTask?._id === taskId) {
+        setSelectedTask(response.data);
+      }
+    } catch (error) {
+      console.warn('Failed to assign task');
+    }
+  };
+
+  const handleAddComment = async (taskId: string) => {
+    if (!newComment.trim()) return;
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/tasks/${taskId}/comments`,
+        { text: newComment },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTasks(tasks.map((t) => (t._id === taskId ? response.data : t)));
+      if (selectedTask?._id === taskId) {
+        setSelectedTask(response.data);
+      }
+      setNewComment('');
+    } catch (error) {
+      console.warn('Failed to add comment');
+    }
+  };
+
+  const handleAddLabel = async (taskId: string) => {
+    if (!newLabel.trim()) return;
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/tasks/${taskId}/labels`,
+        { label: newLabel },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTasks(tasks.map((t) => (t._id === taskId ? response.data : t)));
+      if (selectedTask?._id === taskId) {
+        setSelectedTask(response.data);
+      }
+      setNewLabel('');
+    } catch (error) {
+      console.warn('Failed to add label');
+    }
+  };
+
+  const handleRemoveLabel = async (taskId: string, label: string) => {
+    try {
+      const response = await axios.delete(
+        `${API_URL}/api/tasks/${taskId}/labels/${encodeURIComponent(label)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTasks(tasks.map((t) => (t._id === taskId ? response.data : t)));
+      if (selectedTask?._id === taskId) {
+        setSelectedTask(response.data);
+      }
+    } catch (error) {
+      console.warn('Failed to remove label');
+    }
+  };
+
+  const handleLogTime = async (taskId: string, minutes: number) => {
+    if (minutes <= 0) return;
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/tasks/${taskId}/time`,
+        { duration: minutes },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTasks(tasks.map((t) => (t._id === taskId ? response.data : t)));
+      if (selectedTask?._id === taskId) {
+        setSelectedTask(response.data);
+      }
+    } catch (error) {
+      console.warn('Failed to log time');
     }
   };
 
@@ -331,14 +482,37 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
                       key={task._id}
                       draggable
                       onDragStart={() => handleDragStart(task)}
-                      className="task-card bg-white dark:bg-slate-700 rounded-lg p-4 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-move transform border border-slate-200 dark:border-slate-600 dark:shadow-slate-950"
+                      onClick={() => {
+                        setSelectedTask(task);
+                        setShowTaskDetails(true);
+                      }}
+                      className="task-card bg-white dark:bg-slate-700 rounded-lg p-4 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer transform border border-slate-200 dark:border-slate-600 dark:shadow-slate-950"
                     >
                       <div className="task-header flex items-start justify-between gap-2 mb-2">
-                        <h4 className="task-title font-medium text-slate-900 dark:text-white flex-1 leading-snug text-sm">
-                          {task.title}
-                        </h4>
+                        <div className="flex-1">
+                          <h4 className="task-title font-medium text-slate-900 dark:text-white leading-snug text-sm">
+                            {task.title}
+                          </h4>
+                          {task.labels.length > 0 && (
+                            <div className="flex gap-1 mt-1 flex-wrap">
+                              {task.labels.slice(0, 2).map((label) => (
+                                <span key={label} className="inline-block px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full">
+                                  {label}
+                                </span>
+                              ))}
+                              {task.labels.length > 2 && (
+                                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                  +{task.labels.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         <button
-                          onClick={() => handleDeleteTask(task._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTask(task._id);
+                          }}
                           className="delete-btn text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -349,6 +523,15 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
                         <p className="task-description text-slate-600 dark:text-slate-300 text-xs mt-2 line-clamp-2">
                           {task.description}
                         </p>
+                      )}
+
+                      {task.assignee && (
+                        <div className="task-assignee flex items-center gap-2 mt-2 text-xs">
+                          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                            {task.assignee.name[0]}
+                          </div>
+                          <span className="text-slate-600 dark:text-slate-300">{task.assignee.name}</span>
+                        </div>
                       )}
 
                       <div className="task-meta space-y-3 mt-3 pt-3 border-t border-slate-100">
@@ -440,6 +623,205 @@ export default function KanbanBoard({ projectId, token }: KanbanBoardProps) {
           );
         })}
       </div>
+
+      {/* Task Details Modal */}
+      {showTaskDetails && selectedTask && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{selectedTask.title}</h2>
+              <button
+                onClick={() => setShowTaskDetails(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Description */}
+              {selectedTask.description && (
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Description</h3>
+                  <p className="text-slate-600 dark:text-slate-300">{selectedTask.description}</p>
+                </div>
+              )}
+
+              {/* Task Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold mb-1">Priority</p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${PRIORITY_COLORS[selectedTask.priority]}`}>
+                    {selectedTask.priority.toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold mb-1">Status</p>
+                  <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-semibold">
+                    {selectedTask.status}
+                  </span>
+                </div>
+                {selectedTask.dueDate && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold mb-1">Due Date</p>
+                    <p className="text-slate-900 dark:text-white">{new Date(selectedTask.dueDate).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Assignee */}
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Assigned To</h3>
+                <select
+                  value={selectedTask.assignee?._id || ''}
+                  onChange={(e) => handleAssignTask(selectedTask._id, e.target.value || null)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((member) => (
+                    <option key={member._id} value={member._id}>
+                      {member.name} ({member.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Labels */}
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Labels</h3>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {selectedTask.labels.map((label) => (
+                    <div
+                      key={label}
+                      className="flex items-center gap-2 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm"
+                    >
+                      {label}
+                      <button
+                        onClick={() => handleRemoveLabel(selectedTask._id, label)}
+                        className="hover:text-purple-900 dark:hover:text-purple-100 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') handleAddLabel(selectedTask._id);
+                    }}
+                    placeholder="Add new label..."
+                    className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    onClick={() => handleAddLabel(selectedTask._id)}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Time Tracking */}
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Time Tracked</h3>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-3">{selectedTask.totalTimeSpent} minutes</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Minutes"
+                    min="1"
+                    className="w-24 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const minutes = parseInt((e.target as HTMLInputElement).value);
+                        handleLogTime(selectedTask._id, minutes);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={(e) => {
+                      const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement;
+                      const minutes = parseInt(input.value);
+                      handleLogTime(selectedTask._id, minutes);
+                      input.value = '';
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Log Time
+                  </button>
+                </div>
+              </div>
+
+              {/* Comments */}
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Comments ({selectedTask.comments.length})</h3>
+                <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                  {selectedTask.comments.length === 0 ? (
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">No comments yet</p>
+                  ) : (
+                    selectedTask.comments.map((comment) => (
+                      <div key={comment._id} className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-medium text-slate-900 dark:text-white text-sm">{comment.author.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {new Date(comment.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <p className="text-slate-700 dark:text-slate-300 text-sm">{comment.text}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') handleAddComment(selectedTask._id);
+                    }}
+                    placeholder="Add a comment..."
+                    className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <button
+                    onClick={() => handleAddComment(selectedTask._id)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    Comment
+                  </button>
+                </div>
+              </div>
+
+              {/* Activity Feed */}
+              {selectedTask.activityFeed.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Activity</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {selectedTask.activityFeed.map((activity) => (
+                      <div key={activity._id} className="flex gap-3 text-sm text-slate-600 dark:text-slate-400">
+                        <p className="font-medium text-slate-900 dark:text-white">{activity.userId.name}</p>
+                        <p>{activity.description || activity.action}</p>
+                        <p className="text-xs">{new Date(activity.timestamp).toLocaleDateString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

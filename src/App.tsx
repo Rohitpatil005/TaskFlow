@@ -3,6 +3,8 @@ import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectPage from './pages/ProjectPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import CalendarPage from './pages/CalendarPage';
 
 export default function App() {
   const { token, isLoading } = useAuthStore();
@@ -41,6 +43,8 @@ export default function App() {
           <>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/project/:projectId" element={<ProjectPage />} />
+            <Route path="/project/:projectId/analytics" element={<AnalyticsPage />} />
+            <Route path="/project/:projectId/calendar" element={<CalendarPage />} />
             <Route path="*" element={<Navigate to="/" />} />
           </>
         )}

@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import axios from 'axios';
-import { ArrowLeft, Moon, Sun } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, BarChart3, Calendar as CalendarIcon, Download, X } from 'lucide-react';
 import KanbanBoard from '../components/KanbanBoard';
+import { exportToCSV, exportToPDF, exportToJSON } from '../services/exportService';
 
 interface Project {
   _id: string;
@@ -24,6 +25,8 @@ export default function ProjectPage() {
   const { isDark, toggleTheme } = useThemeStore();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
     if (projectId && token) {
@@ -33,11 +36,16 @@ export default function ProjectPage() {
 
   const fetchProject = async () => {
     try {
-      const response = await axios.get(
-        `${API_URL}/api/projects/${projectId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setProject(response.data);
+      const [projectResponse, tasksResponse] = await Promise.all([
+        axios.get(`${API_URL}/api/projects/${projectId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_URL}/api/tasks/project/${projectId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => ({ data: [] }))
+      ]);
+      setProject(projectResponse.data);
+      setTasks(tasksResponse.data);
     } catch (error) {
       console.warn('Failed to fetch project from API, using demo data');
       // Use demo data if backend is not available
@@ -118,6 +126,38 @@ export default function ProjectPage() {
     );
   }
 
+  const handleExport = (format: 'csv' | 'pdf' | 'json') => {
+    const completedTasks = tasks.filter((t) => t.status === 'done').length;
+    const exportData = {
+      projectName: project.name,
+      exportDate: new Date().toISOString(),
+      totalTasks: tasks.length,
+      completedTasks,
+      tasks: tasks.map((task) => ({
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        priority: task.priority,
+        assignee: task.assignee?.name,
+        dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : undefined,
+        labels: task.labels,
+        comments: task.comments?.length || 0,
+        timeSpent: task.totalTimeSpent
+      })),
+      teamMembers: project.members
+    };
+
+    if (format === 'csv') {
+      exportToCSV(exportData);
+    } else if (format === 'pdf') {
+      exportToPDF(exportData);
+    } else if (format === 'json') {
+      exportToJSON(exportData);
+    }
+
+    setShowExportModal(false);
+  };
+
   return (
     <div className="project-page min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 transition-colors duration-300">
       {/* Header */}
@@ -131,12 +171,35 @@ export default function ProjectPage() {
               <ArrowLeft className="w-4 h-4" />
               Back to Projects
             </button>
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 text-slate-300 hover:text-white transition-all"
-            >
-              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(`/project/${projectId}/analytics`)}
+                className="analytics-btn flex items-center gap-2 px-4 py-2 bg-slate-700/30 hover:bg-slate-700/50 text-slate-300 hover:text-white rounded-lg transition-all font-medium"
+              >
+                <BarChart3 className="w-5 h-5" />
+                Analytics
+              </button>
+              <button
+                onClick={() => navigate(`/project/${projectId}/calendar`)}
+                className="calendar-btn flex items-center gap-2 px-4 py-2 bg-slate-700/30 hover:bg-slate-700/50 text-slate-300 hover:text-white rounded-lg transition-all font-medium"
+              >
+                <CalendarIcon className="w-5 h-5" />
+                Calendar
+              </button>
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="export-btn flex items-center gap-2 px-4 py-2 bg-slate-700/30 hover:bg-slate-700/50 text-slate-300 hover:text-white rounded-lg transition-all font-medium"
+              >
+                <Download className="w-5 h-5" />
+                Export
+              </button>
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 text-slate-300 hover:text-white transition-all"
+              >
+                {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
           <div className="project-header-content">
             <h1 className="project-title text-4xl font-bold text-white mb-2">
@@ -218,6 +281,66 @@ export default function ProjectPage() {
           )}
         </div>
       </main>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Export Project</h2>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-slate-600 dark:text-slate-400 mb-6">Choose format to export your project data:</p>
+
+              <button
+                onClick={() => handleExport('csv')}
+                className="w-full flex items-center gap-3 p-4 border-2 border-slate-200 dark:border-slate-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left"
+              >
+                <div className="flex items-center justify-center w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <span className="text-lg">📊</span>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900 dark:text-white">CSV Format</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Spreadsheet compatible</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleExport('pdf')}
+                className="w-full flex items-center gap-3 p-4 border-2 border-slate-200 dark:border-slate-700 rounded-lg hover:border-red-500 dark:hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-left"
+              >
+                <div className="flex items-center justify-center w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                  <span className="text-lg">📄</span>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900 dark:text-white">PDF Format</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Printable document</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleExport('json')}
+                className="w-full flex items-center gap-3 p-4 border-2 border-slate-200 dark:border-slate-700 rounded-lg hover:border-green-500 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all text-left"
+              >
+                <div className="flex items-center justify-center w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <span className="text-lg">⚙️</span>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900 dark:text-white">JSON Format</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">For backup & import</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
